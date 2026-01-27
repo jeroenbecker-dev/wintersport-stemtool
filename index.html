@@ -14,8 +14,8 @@
         // ===== FIREBASE CONFIGURATIE =====
         // Vervang deze waarden met jouw eigen Firebase project configuratie
         const firebaseConfig = {
-          apiKey: "AIzaSyAlXE6fmt0j_7MkRhllTTzR3eGLDrqzryo",
-      authDomain: "wintersport-2027.firebaseapp.com",
+      apiKey: "AIzaSyAlXE6fmt0j_7MkRhllTTzR3eGLDrqzryo",
+        authDomain: "wintersport-2027.firebaseapp.com",
       databaseURL: "https://wintersport-2027-default-rtdb.europe-west1.firebasedatabase.app",
         projectId: "wintersport-2027",
       storageBucket: "wintersport-2027.firebasestorage.app",
@@ -252,13 +252,16 @@
         let state = {
             accommodations: [],
             votes: {},
-            locationVotes: {}, // New: votes for villages and resorts
+            locationVotes: {}, // votes for villages and resorts
+            locationData: {}, // metadata for villages and resorts (descriptions, images, stats)
             userName: localStorage.getItem('userName') || '',
             hasSetName: !!localStorage.getItem('userName'),
-            currentView: 'locations', // 'locations' or 'accommodations'
+            currentView: 'locations', // 'locations', 'preference', or 'accommodations'
+            accommodationPreference: localStorage.getItem('accommodationPreference') || '',
             isAdmin: false,
             isEditing: false,
             editingId: null,
+            editingLocation: null, // {type: 'village'|'resort', name: '...'}
             loading: true,
             imageErrors: {},
             showImportDialog: false,
@@ -325,6 +328,17 @@
                 }
                 render();
             });
+
+            // Listen to location metadata
+            const locDataRef = window.firebaseRef(window.firebaseDB, 'locationData');
+            window.firebaseOnValue(locDataRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    state.locationData = snapshot.val();
+                } else {
+                    state.locationData = {};
+                }
+                render();
+            });
         }
 
         // Get unique villages and resorts from accommodations
@@ -359,6 +373,50 @@
 
         function switchView(view) {
             state.currentView = view;
+            render();
+        }
+
+        function selectAccommodationPreference(preference) {
+            localStorage.setItem('accommodationPreference', preference);
+            state.accommodationPreference = preference;
+            
+            // Save to Firebase for admin visibility
+            if (window.firebaseDB && state.userName) {
+                const prefPath = `preferences/${state.userName}`;
+                const prefRef = window.firebaseRef(window.firebaseDB, prefPath);
+                window.firebaseSet(prefRef, {
+                    type: preference,
+                    timestamp: Date.now()
+                });
+            }
+            
+            switchView('accommodations');
+        }
+
+        function getLocationData(type, name) {
+            return state.locationData?.[type]?.[name] || {};
+        }
+
+        async function saveLocationData(type, name, data) {
+            try {
+                const path = `locationData/${type}/${name}`;
+                const ref = window.firebaseRef(window.firebaseDB, path);
+                await window.firebaseSet(ref, data);
+                state.editingLocation = null;
+                render();
+            } catch (error) {
+                console.error('Error saving location data:', error);
+                alert('Fout bij opslaan. Probeer opnieuw.');
+            }
+        }
+
+        function startEditLocation(type, name) {
+            state.editingLocation = { type, name };
+            render();
+        }
+
+        function cancelEditLocation() {
+            state.editingLocation = null;
             render();
         }
 
@@ -502,6 +560,7 @@
                 accommodations: state.accommodations,
                 votes: state.votes,
                 locationVotes: state.locationVotes,
+                locationData: state.locationData,
                 exportDate: new Date().toISOString()
             };
             
@@ -559,6 +618,11 @@
                 if (data.locationVotes) {
                     const locVotesRef = window.firebaseRef(window.firebaseDB, 'locationVotes');
                     await window.firebaseSet(locVotesRef, data.locationVotes);
+                }
+
+                if (data.locationData) {
+                    const locDataRef = window.firebaseRef(window.firebaseDB, 'locationData');
+                    await window.firebaseSet(locDataRef, data.locationData);
                 }
                 
                 alert(`✅ Import succesvol! ${data.accommodations.length} accommodaties geladen.`);
@@ -708,6 +772,39 @@
             alert(message);
         }
 
+        async function showPreferencesOverview() {
+            if (!window.firebaseDB) return;
+            
+            try {
+                const prefRef = window.firebaseRef(window.firebaseDB, 'preferences');
+                const snapshot = await window.firebaseGet(prefRef);
+                
+                if (!snapshot.exists()) {
+                    alert('Nog geen voorkeuren ingediend.');
+                    return;
+                }
+                
+                const prefs = snapshot.val();
+                const typeLabels = {
+                    'groepsaccomodatie': '🏠 Groepsaccommodatie',
+                    'appartementhotel': '🏨 Apparthotel',
+                    'hotel': '🏩 Hotel',
+                    'wacht_af': '⏳ Wacht nog af'
+                };
+                
+                let message = '📊 Accommodatie Voorkeuren:\n\n';
+                Object.entries(prefs).forEach(([user, data]) => {
+                    const label = typeLabels[data.type] || data.type;
+                    message += `• ${user}: ${label}\n`;
+                });
+                
+                alert(message);
+            } catch (error) {
+                console.error('Error loading preferences:', error);
+                alert('Fout bij laden voorkeuren.');
+            }
+        }
+
         function handleImageError(accId) {
             state.imageErrors[accId] = true;
             render();
@@ -845,33 +942,172 @@
             `;
         }
 
-        function renderLocationVoting() {
-            const { villages, resorts } = getUniqueLocations();
-
+        function renderPreferenceView() {
             return `
-                <div class="max-w-6xl mx-auto p-4">
-                    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-                        <div class="flex justify-between items-center">
+                <div class="max-w-4xl mx-auto p-4">
+                    <div class="bg-white rounded-xl shadow-lg p-8">
+                        <div class="flex justify-between items-center mb-6">
                             <div>
                                 <h1 class="text-3xl font-bold text-gray-800 mb-2">
-                                    🗳️ Stem op Dorpen & Skigebieden
+                                    🏠 Stap 2: Welk type accommodatie heeft je voorkeur?
                                 </h1>
-                                <p class="text-gray-600 mb-4">
-                                    Stem eerst op je favoriete dorpen en skigebieden, daarna kun je specifieke accommodaties bekijken.
+                                <p class="text-gray-600">
+                                    Selecteer het type accommodatie waar je de voorkeur aan geeft. Dit helpt ons om de beste opties te tonen.
                                 </p>
                             </div>
-                            ${state.isAdmin ? `
+                            <div class="flex gap-2">
+                                <button 
+                                    onclick="exportData()"
+                                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                                    📥 Backup
+                                </button>
                                 <button 
                                     onclick="toggleAdmin()"
                                     class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
-                                    Admin Mode Uit
+                                    ${state.isAdmin ? 'Admin Mode Uit' : 'Admin Mode'}
                                 </button>
-                            ` : ''}
+                            </div>
                         </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <button 
+                                onclick="selectAccommodationPreference('groepsaccomodatie')"
+                                class="p-6 border-2 border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition text-left group">
+                                <div class="text-4xl mb-3">🏠</div>
+                                <h3 class="text-xl font-bold text-gray-800 mb-2">Groepsaccommodatie</h3>
+                                <p class="text-gray-600 text-sm">
+                                    Een heel chalet of huis voor de hele groep. Vaak met eigen keuken en woonruimte.
+                                </p>
+                            </button>
+
+                            <button 
+                                onclick="selectAccommodationPreference('appartementhotel')"
+                                class="p-6 border-2 border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition text-left group">
+                                <div class="text-4xl mb-3">🏨</div>
+                                <h3 class="text-xl font-bold text-gray-800 mb-2">Apparthotel</h3>
+                                <p class="text-gray-600 text-sm">
+                                    Meerdere appartementen in hetzelfde gebouw. Eigen keuken, soms gezamenlijke voorzieningen.
+                                </p>
+                            </button>
+
+                            <button 
+                                onclick="selectAccommodationPreference('hotel')"
+                                class="p-6 border-2 border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition text-left group">
+                                <div class="text-4xl mb-3">🏩</div>
+                                <h3 class="text-xl font-bold text-gray-800 mb-2">Hotel</h3>
+                                <p class="text-gray-600 text-sm">
+                                    Traditioneel hotel met kamers en eventueel familiekamers. Meestal met restaurant en ontbijt.
+                                </p>
+                            </button>
+
+                            <button 
+                                onclick="selectAccommodationPreference('wacht_af')"
+                                class="p-6 border-2 border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition text-left group">
+                                <div class="text-4xl mb-3">⏳</div>
+                                <h3 class="text-xl font-bold text-gray-800 mb-2">Ik wacht nog even af</h3>
+                                <p class="text-gray-600 text-sm">
+                                    Als de voorkeurslocatie bekend is, ga ik zelf op zoek naar een geschikt verblijf.
+                                </p>
+                            </button>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <button 
+                                onclick="switchView('locations')"
+                                class="px-6 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition">
+                                ← Terug naar Locaties
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderLocationVoting() {
+            const { villages, resorts } = getUniqueLocations();
+
+            // Calculate aggregate stats from accommodations
+            const getVillageStats = (village) => {
+                const vilAccs = state.accommodations.filter(a => a.village === village);
+                if (vilAccs.length === 0) return null;
+                const avgApreSki = Math.round(vilAccs.reduce((sum, a) => sum + (a.apreSki || 0), 0) / vilAccs.length);
+                const resort = vilAccs[0]?.resort || '';
+                return { apreSki: avgApreSki, resort: resort };
+            };
+
+            const getResortStats = (resort) => {
+                const resAccs = state.accommodations.filter(a => a.resort === resort);
+                if (resAccs.length === 0) return null;
+                const avgSnow = Math.round(resAccs.reduce((sum, a) => sum + (a.snowCertainty || 0), 0) / resAccs.length);
+                const avgChild = Math.round(resAccs.reduce((sum, a) => sum + (a.childFriendly || 0), 0) / resAccs.length);
+                const totalKm = resAccs[0]?.kmSlopes || 0;
+                return { snowCertainty: avgSnow, childFriendly: avgChild, kmSlopes: totalKm };
+            };
+
+            return `
+                <div class="max-w-7xl mx-auto p-4">
+                    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                                    🗳️ Stap 1: Stem op Dorpen & Skigebieden
+                                </h1>
+                                <p class="text-gray-600">
+                                    Stem op je favoriete locaties. Klik daarna op "Volgende stap" om je voorkeur voor accommodatietype aan te geven.
+                                </p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button 
+                                    onclick="exportData()"
+                                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                                    title="Exporteer data">
+                                    📥 Backup
+                                </button>
+                                <button 
+                                    onclick="showImportDialog()"
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                                    title="Importeer data">
+                                    📤 Import
+                                </button>
+                                <button 
+                                    onclick="toggleAdmin()"
+                                    class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                                    ${state.isAdmin ? 'Admin Mode Uit' : 'Admin Mode'}
+                                </button>
+                            </div>
+                        </div>
+
+                        ${state.showImportDialog ? `
+                            <div class="mb-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                                <h3 class="font-bold text-blue-800 mb-2">📤 Data Importeren</h3>
+                                <p class="text-sm text-blue-700 mb-3">
+                                    Plak hier de inhoud van je backup:
+                                </p>
+                                <textarea
+                                    id="importTextarea"
+                                    placeholder='{"accommodations": [...], "votes": {...}}'
+                                    class="w-full px-3 py-2 border border-blue-300 rounded-lg font-mono text-xs mb-3"
+                                    rows="6"
+                                ></textarea>
+                                <div class="flex gap-2">
+                                    <button 
+                                        onclick="importData()"
+                                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                        Importeer
+                                    </button>
+                                    <button 
+                                        onclick="hideImportDialog()"
+                                        class="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition">
+                                        Annuleren
+                                    </button>
+                                </div>
+                            </div>
+                        ` : ''}
+
                         <button 
-                            onclick="switchView('accommodations')"
+                            onclick="switchView('preference')"
                             class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                            Ga naar Accommodaties →
+                            Volgende stap: Accommodatietype →
                         </button>
                     </div>
 
@@ -879,18 +1115,77 @@
                         <!-- Villages -->
                         <div class="bg-white rounded-xl shadow-lg p-6">
                             <h2 class="text-2xl font-bold text-gray-800 mb-4">📍 Dorpen</h2>
-                            <div class="space-y-3">
+                            <div class="space-y-4">
                                 ${villages.map(village => {
                                     const upCount = getLocationVoteCount('villages', village, 'up');
                                     const downCount = getLocationVoteCount('villages', village, 'down');
                                     const userUpVote = hasUserVotedLocation('villages', village, 'up');
                                     const userDownVote = hasUserVotedLocation('villages', village, 'down');
+                                    const locData = getLocationData('villages', village);
+                                    const stats = getVillageStats(village);
+                                    const isEditing = state.editingLocation?.type === 'villages' && state.editingLocation?.name === village;
+                                    
+                                    if (isEditing && state.isAdmin) {
+                                        return `
+                                            <div class="p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                                                <h3 class="font-bold text-blue-800 mb-3">${village} bewerken</h3>
+                                                <div class="space-y-2">
+                                                    <div>
+                                                        <label class="block text-sm font-medium mb-1">Omschrijving</label>
+                                                        <input type="text" id="villageDesc" value="${locData.description || ''}"
+                                                            placeholder="Bijv: Klein dorp met gezellig centrum"
+                                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-sm font-medium mb-1">Foto URL</label>
+                                                        <input type="url" id="villageImage" value="${locData.imageUrl || ''}"
+                                                            placeholder="https://..."
+                                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                                    </div>
+                                                    <div class="flex gap-2">
+                                                        <button 
+                                                            onclick="saveLocationData('villages', '${village}', {
+                                                                description: document.getElementById('villageDesc').value,
+                                                                imageUrl: document.getElementById('villageImage').value
+                                                            })"
+                                                            class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
+                                                            💾 Opslaan
+                                                        </button>
+                                                        <button 
+                                                            onclick="cancelEditLocation()"
+                                                            class="px-3 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition text-sm">
+                                                            ❌ Annuleren
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }
                                     
                                     return `
-                                        <div class="p-3 bg-gray-50 rounded-lg">
-                                            <div class="flex items-center justify-between mb-2">
-                                                <span class="font-medium text-gray-800">${village}</span>
-                                                <div class="flex gap-2">
+                                        <div class="p-4 bg-gray-50 rounded-lg">
+                                            ${locData.imageUrl ? `
+                                                <img src="${locData.imageUrl}" alt="${village}" 
+                                                    class="w-full h-32 object-cover rounded-lg mb-3"
+                                                    onerror="this.style.display='none'">
+                                            ` : ''}
+                                            <div class="flex items-start justify-between mb-2">
+                                                <div class="flex-1">
+                                                    <h3 class="font-bold text-gray-800 text-lg">${village}</h3>
+                                                    ${stats ? `
+                                                        <p class="text-blue-600 text-sm font-medium mt-0.5">🏔️ ${stats.resort}</p>
+                                                    ` : ''}
+                                                    ${locData.description ? `
+                                                        <p class="text-gray-600 text-sm italic mt-1">${locData.description}</p>
+                                                    ` : ''}
+                                                    ${stats ? `
+                                                        <div class="flex items-center gap-2 mt-2">
+                                                            <span class="text-sm text-gray-600">🍺 Après-ski:</span>
+                                                            <div class="flex gap-0.5">${renderStars(stats.apreSki)}</div>
+                                                        </div>
+                                                    ` : ''}
+                                                </div>
+                                                <div class="flex gap-2 ml-3">
                                                     <button onclick="handleLocationVote('villages', '${village}', 'up')" 
                                                         class="flex items-center gap-1 px-3 py-1 rounded-lg transition ${
                                                             userUpVote ? 'bg-green-600 text-white' : 'bg-white text-gray-700 hover:bg-green-50'
@@ -906,10 +1201,16 @@
                                                 </div>
                                             </div>
                                             ${state.isAdmin ? `
-                                                <button onclick="showLocationVoteDetails('villages', '${village}')" 
-                                                    class="w-full px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition text-xs">
-                                                    📊 Bekijk wie gestemd heeft
-                                                </button>
+                                                <div class="flex gap-2 mt-3 pt-3 border-t">
+                                                    <button onclick="startEditLocation('villages', '${village}')" 
+                                                        class="flex-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition text-sm">
+                                                        ✏️ Bewerk info
+                                                    </button>
+                                                    <button onclick="showLocationVoteDetails('villages', '${village}')" 
+                                                        class="flex-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition text-sm">
+                                                        📊 Stemmen
+                                                    </button>
+                                                </div>
                                             ` : ''}
                                         </div>
                                     `;
@@ -920,18 +1221,74 @@
                         <!-- Resorts -->
                         <div class="bg-white rounded-xl shadow-lg p-6">
                             <h2 class="text-2xl font-bold text-gray-800 mb-4">🏔️ Skigebieden</h2>
-                            <div class="space-y-3">
+                            <div class="space-y-4">
                                 ${resorts.map(resort => {
                                     const upCount = getLocationVoteCount('resorts', resort, 'up');
                                     const downCount = getLocationVoteCount('resorts', resort, 'down');
                                     const userUpVote = hasUserVotedLocation('resorts', resort, 'up');
                                     const userDownVote = hasUserVotedLocation('resorts', resort, 'down');
+                                    const locData = getLocationData('resorts', resort);
+                                    const stats = getResortStats(resort);
+                                    const isEditing = state.editingLocation?.type === 'resorts' && state.editingLocation?.name === resort;
+                                    
+                                    if (isEditing && state.isAdmin) {
+                                        return `
+                                            <div class="p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                                                <h3 class="font-bold text-blue-800 mb-3">${resort} bewerken</h3>
+                                                <div class="space-y-2">
+                                                    <div>
+                                                        <label class="block text-sm font-medium mb-1">Skikaart URL</label>
+                                                        <input type="url" id="resortImage" value="${locData.imageUrl || ''}"
+                                                            placeholder="https://..."
+                                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                                    </div>
+                                                    <div class="flex gap-2">
+                                                        <button 
+                                                            onclick="saveLocationData('resorts', '${resort}', {
+                                                                imageUrl: document.getElementById('resortImage').value
+                                                            })"
+                                                            class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
+                                                            💾 Opslaan
+                                                        </button>
+                                                        <button 
+                                                            onclick="cancelEditLocation()"
+                                                            class="px-3 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition text-sm">
+                                                            ❌ Annuleren
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }
                                     
                                     return `
-                                        <div class="p-3 bg-gray-50 rounded-lg">
-                                            <div class="flex items-center justify-between mb-2">
-                                                <span class="font-medium text-gray-800">${resort}</span>
-                                                <div class="flex gap-2">
+                                        <div class="p-4 bg-gray-50 rounded-lg">
+                                            ${locData.imageUrl ? `
+                                                <img src="${locData.imageUrl}" alt="${resort} skikaart" 
+                                                    class="w-full h-40 object-cover rounded-lg mb-3"
+                                                    onerror="this.style.display='none'">
+                                            ` : ''}
+                                            <div class="flex items-start justify-between mb-2">
+                                                <div class="flex-1">
+                                                    <h3 class="font-bold text-gray-800 text-lg">${resort}</h3>
+                                                    ${stats ? `
+                                                        <div class="space-y-1 mt-2 text-sm">
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="text-gray-600 w-32">🏔️ Km pistes:</span>
+                                                                <span class="font-semibold">${stats.kmSlopes} km</span>
+                                                            </div>
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="text-gray-600 w-32">❄️ Sneeuwzekerheid:</span>
+                                                                <div class="flex gap-0.5">${renderStars(stats.snowCertainty)}</div>
+                                                            </div>
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="text-gray-600 w-32">👨‍👩‍👧‍👦 Kindvriendelijk:</span>
+                                                                <div class="flex gap-0.5">${renderStars(stats.childFriendly)}</div>
+                                                            </div>
+                                                        </div>
+                                                    ` : ''}
+                                                </div>
+                                                <div class="flex gap-2 ml-3">
                                                     <button onclick="handleLocationVote('resorts', '${resort}', 'up')" 
                                                         class="flex items-center gap-1 px-3 py-1 rounded-lg transition ${
                                                             userUpVote ? 'bg-green-600 text-white' : 'bg-white text-gray-700 hover:bg-green-50'
@@ -947,10 +1304,16 @@
                                                 </div>
                                             </div>
                                             ${state.isAdmin ? `
-                                                <button onclick="showLocationVoteDetails('resorts', '${resort}')" 
-                                                    class="w-full px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition text-xs">
-                                                    📊 Bekijk wie gestemd heeft
-                                                </button>
+                                                <div class="flex gap-2 mt-3 pt-3 border-t">
+                                                    <button onclick="startEditLocation('resorts', '${resort}')" 
+                                                        class="flex-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition text-sm">
+                                                        ✏️ Skikaart toevoegen
+                                                    </button>
+                                                    <button onclick="showLocationVoteDetails('resorts', '${resort}')" 
+                                                        class="flex-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition text-sm">
+                                                        📊 Stemmen
+                                                    </button>
+                                                </div>
                                             ` : ''}
                                         </div>
                                     `;
@@ -1000,6 +1363,12 @@
             // Location voting view
             if (state.currentView === 'locations') {
                 app.innerHTML = renderLocationVoting();
+                return;
+            }
+
+            // Preference selection view
+            if (state.currentView === 'preference') {
+                app.innerHTML = renderPreferenceView();
                 return;
             }
 
