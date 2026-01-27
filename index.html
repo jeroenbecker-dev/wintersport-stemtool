@@ -14,14 +14,14 @@
         // ===== FIREBASE CONFIGURATIE =====
         // Vervang deze waarden met jouw eigen Firebase project configuratie
         const firebaseConfig = {
-            apiKey: "AIzaSyAlXE6fmt0j_7MkRhllTTzR3eGLDrqzryo",
-  authDomain: "wintersport-2027.firebaseapp.com",
-  databaseURL: "https://wintersport-2027-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "wintersport-2027",
-  storageBucket: "wintersport-2027.firebasestorage.app",
-  messagingSenderId: "440104424100",
-  appId: "1:440104424100:web:b7c78f4dc30a4bd177cc31",
-  measurementId: "G-81BPH7LR4V"
+           apiKey: "AIzaSyAlXE6fmt0j_7MkRhllTTzR3eGLDrqzryo",
+      authDomain: "wintersport-2027.firebaseapp.com",
+        databaseURL: "https://wintersport-2027-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "wintersport-2027",
+      storageBucket: "wintersport-2027.firebasestorage.app",
+      messagingSenderId: "440104424100",
+    appId: "1:440104424100:web:b7c78f4dc30a4bd177cc31",
+      measurementId: "G-81BPH7LR4V"
         };
 
         // Firebase initialiseren
@@ -1562,6 +1562,7 @@
                                     const isEditing = state.editingLocation?.type === 'resorts' && state.editingLocation?.name === resort;
                                     
                                     if (isEditing && state.isAdmin) {
+                                        const escapedResort = resort.replace(/'/g, "\\'");
                                         return `
                                             <div class="p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
                                                 <h3 class="font-bold text-blue-800 mb-3">${resort} bewerken</h3>
@@ -1584,13 +1585,13 @@
                                                     </div>
                                                     <div>
                                                         <label class="block text-sm font-medium mb-1">Skikaart URL</label>
-                                                        <input type="url" id="resortImage" value="${locData.imageUrl || ''}"
+                                                        <input type="url" id="resortImage" value="${(locData.imageUrl || '').replace(/"/g, '&quot;')}"
                                                             placeholder="https://..."
                                                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                                                     </div>
                                                     <div class="flex gap-2">
                                                         <button 
-                                                            onclick="saveLocationData('resorts', '${resort}', {
+                                                            onclick="saveLocationData('resorts', '${escapedResort}', {
                                                                 kmSlopes: parseInt(document.getElementById('resortKmSlopesEdit').value) || 0,
                                                                 snowCertainty: parseInt(document.getElementById('resortSnowCertaintyEdit').value) || 3,
                                                                 childFriendly: parseInt(document.getElementById('resortChildFriendlyEdit').value) || 3,
