@@ -1428,13 +1428,14 @@
                                     const isEditing = state.editingLocation?.type === 'villages' && state.editingLocation?.name === village;
                                     
                                     if (isEditing && state.isAdmin) {
+                                        const escapedVillage = village.replace(/'/g, "\\'");
                                         return `
                                             <div class="p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
                                                 <h3 class="font-bold text-blue-800 mb-3">${village} bewerken</h3>
                                                 <div class="space-y-2">
                                                     <div>
                                                         <label class="block text-sm font-medium mb-1">Skigebied</label>
-                                                        <input type="text" id="villageResortEdit" value="${locData.resort || ''}"
+                                                        <input type="text" id="villageResortEdit" value="${(locData.resort || '').replace(/"/g, '&quot;')}"
                                                             placeholder="bijv: Zillertal"
                                                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                                                     </div>
@@ -1445,19 +1446,19 @@
                                                     </div>
                                                     <div>
                                                         <label class="block text-sm font-medium mb-1">Omschrijving</label>
-                                                        <input type="text" id="villageDesc" value="${locData.description || ''}"
+                                                        <input type="text" id="villageDesc" value="${(locData.description || '').replace(/"/g, '&quot;')}"
                                                             placeholder="Bijv: Klein dorp met gezellig centrum"
                                                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                                                     </div>
                                                     <div>
                                                         <label class="block text-sm font-medium mb-1">Foto URL</label>
-                                                        <input type="url" id="villageImage" value="${locData.imageUrl || ''}"
+                                                        <input type="url" id="villageImage" value="${(locData.imageUrl || '').replace(/"/g, '&quot;')}"
                                                             placeholder="https://..."
                                                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                                                     </div>
                                                     <div class="flex gap-2">
                                                         <button 
-                                                            onclick="saveLocationData('villages', '${village}', {
+                                                            onclick="saveLocationData('villages', '${escapedVillage}', {
                                                                 resort: document.getElementById('villageResortEdit').value,
                                                                 apreSki: parseInt(document.getElementById('villageApreSkiEdit').value) || 3,
                                                                 description: document.getElementById('villageDesc').value,
