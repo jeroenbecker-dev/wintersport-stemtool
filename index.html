@@ -15,13 +15,13 @@
         // Vervang deze waarden met jouw eigen Firebase project configuratie
         const firebaseConfig = {
             apiKey: "AIzaSyAlXE6fmt0j_7MkRhllTTzR3eGLDrqzryo",
-  	authDomain: "wintersport-2027.firebaseapp.com",
-  	databaseURL: "https://wintersport-2027-default-rtdb.europe-west1.firebasedatabase.app",
-  	projectId: "wintersport-2027",
-  	storageBucket: "wintersport-2027.firebasestorage.app",
-  	messagingSenderId: "440104424100",
-  	appId: "1:440104424100:web:b7c78f4dc30a4bd177cc31",
- 	measurementId: "G-81BPH7LR4V"
+      authDomain: "wintersport-2027.firebaseapp.com",
+        databaseURL: "https://wintersport-2027-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "wintersport-2027",
+        storageBucket: "wintersport-2027.firebasestorage.app",
+      messagingSenderId: "440104424100",
+      appId: "1:440104424100:web:b7c78f4dc30a4bd177cc31",
+      measurementId: "G-81BPH7LR4V"
         };
 
         // Firebase initialiseren
@@ -48,6 +48,7 @@
                 name: "Chalet Katschbergblick",
                 village: "Katschberg",
                 resort: "Lungau",
+                type: "groepsaccomodatie",
                 price: 844,
                 priceExtras: "",
                 apreSki: 2,
@@ -63,6 +64,7 @@
                 name: "Chalet-appartement Heimelig",
                 village: "Saalbach",
                 resort: "SkiCircus Saalbach",
+                type: "appartementhotel",
                 price: 760,
                 priceExtras: "",
                 apreSki: 5,
@@ -78,6 +80,7 @@
                 name: "Chalet Saalach",
                 village: "Viehhofen",
                 resort: "SkiCircus Saalbach",
+                type: "groepsaccomodatie",
                 price: 711,
                 priceExtras: "",
                 apreSki: 1,
@@ -93,6 +96,7 @@
                 name: "Chalet Kaiser Franz Josef Hütte",
                 village: "Hochfugen",
                 resort: "Zillertal",
+                type: "groepsaccomodatie",
                 price: 1230,
                 priceExtras: "skipas",
                 apreSki: 2,
@@ -108,6 +112,7 @@
                 name: "Chalet Forsthaus Daringer",
                 village: "Mayrhofen",
                 resort: "Zillertal",
+                type: "groepsaccomodatie",
                 price: 1018,
                 priceExtras: "skipas",
                 apreSki: 4,
@@ -123,6 +128,7 @@
                 name: "Chalet Grieswirt",
                 village: "Hopfgarten",
                 resort: "SkiWelt Brixental",
+                type: "groepsaccomodatie",
                 price: 1021,
                 priceExtras: "",
                 apreSki: 2,
@@ -138,6 +144,7 @@
                 name: "Chalet Am Brügglbach",
                 village: "Kirchberg",
                 resort: "KitzSki Kitzbühel",
+                type: "groepsaccomodatie",
                 price: 727,
                 priceExtras: "",
                 apreSki: 4,
@@ -153,6 +160,7 @@
                 name: "Chalet Kirchberg",
                 village: "Kirchberg",
                 resort: "KitzSki Kitzbühel",
+                type: "groepsaccomodatie",
                 price: 927,
                 priceExtras: "",
                 apreSki: 4,
@@ -168,6 +176,7 @@
                 name: "Chalet Maria Rose",
                 village: "Kirchberg",
                 resort: "KitzSki Kitzbühel",
+                type: "hotel",
                 price: 741,
                 priceExtras: "",
                 apreSki: 4,
@@ -183,6 +192,7 @@
                 name: "Chalet Alte Mühle",
                 village: "Hopfgarten",
                 resort: "SkiWelt Brixental",
+                type: "groepsaccomodatie",
                 price: 634,
                 priceExtras: "",
                 apreSki: 2,
@@ -198,6 +208,7 @@
                 name: "Chalet Haslau",
                 village: "Hopfgarten",
                 resort: "SkiWelt Brixental",
+                type: "groepsaccomodatie",
                 price: 607,
                 priceExtras: "",
                 apreSki: 2,
@@ -241,18 +252,26 @@
         let state = {
             accommodations: [],
             votes: {},
+            locationVotes: {}, // New: votes for villages and resorts
             userName: localStorage.getItem('userName') || '',
             hasSetName: !!localStorage.getItem('userName'),
+            currentView: 'locations', // 'locations' or 'accommodations'
             isAdmin: false,
             isEditing: false,
             editingId: null,
             loading: true,
             imageErrors: {},
             showImportDialog: false,
+            filters: {
+                village: '',
+                resort: '',
+                type: ''
+            },
             formData: {
                 name: '',
                 resort: '',
                 village: '',
+                type: 'groepsaccomodatie',
                 url: '',
                 imageUrl: '',
                 snowCertainty: 3,
@@ -295,6 +314,39 @@
                 }
                 render();
             });
+
+            // Listen to location votes
+            const locVotesRef = window.firebaseRef(window.firebaseDB, 'locationVotes');
+            window.firebaseOnValue(locVotesRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    state.locationVotes = snapshot.val();
+                } else {
+                    state.locationVotes = {};
+                }
+                render();
+            });
+        }
+
+        // Get unique villages and resorts from accommodations
+        function getUniqueLocations() {
+            const villages = [...new Set(state.accommodations.map(acc => acc.village).filter(Boolean))].sort();
+            const resorts = [...new Set(state.accommodations.map(acc => acc.resort).filter(Boolean))].sort();
+            
+            // Also get any additional locations from locationVotes
+            if (state.locationVotes.villages) {
+                Object.keys(state.locationVotes.villages).forEach(v => {
+                    if (!villages.includes(v)) villages.push(v);
+                });
+                villages.sort();
+            }
+            if (state.locationVotes.resorts) {
+                Object.keys(state.locationVotes.resorts).forEach(r => {
+                    if (!resorts.includes(r)) resorts.push(r);
+                });
+                resorts.sort();
+            }
+            
+            return { villages, resorts };
         }
 
         // Actions
@@ -303,6 +355,41 @@
             state.userName = name;
             state.hasSetName = true;
             render();
+        }
+
+        function switchView(view) {
+            state.currentView = view;
+            render();
+        }
+
+        async function handleLocationVote(type, name, voteType) {
+            if (!state.userName || !window.firebaseDB) return;
+
+            const votePath = `locationVotes/${type}/${name}/${state.userName}`;
+            const voteRef = window.firebaseRef(window.firebaseDB, votePath);
+            
+            try {
+                const snapshot = await window.firebaseGet(voteRef);
+                const currentVote = snapshot.val();
+
+                if (currentVote === voteType) {
+                    await window.firebaseSet(voteRef, null);
+                } else {
+                    await window.firebaseSet(voteRef, voteType);
+                }
+            } catch (error) {
+                console.error('Fout bij stemmen:', error);
+                alert('Fout bij opslaan stem. Probeer opnieuw.');
+            }
+        }
+
+        function getLocationVoteCount(type, name, voteType) {
+            if (!state.locationVotes[type] || !state.locationVotes[type][name]) return 0;
+            return Object.values(state.locationVotes[type][name]).filter(v => v === voteType).length;
+        }
+
+        function hasUserVotedLocation(type, name, voteType) {
+            return state.locationVotes[type]?.[name]?.[state.userName] === voteType;
         }
 
         async function handleVote(accId, voteType) {
@@ -316,10 +403,8 @@
                 const currentVote = snapshot.val();
 
                 if (currentVote === voteType) {
-                    // Remove vote
                     await window.firebaseSet(voteRef, null);
                 } else {
-                    // Add or change vote
                     await window.firebaseSet(voteRef, voteType);
                 }
             } catch (error) {
@@ -335,6 +420,25 @@
 
         function hasUserVoted(accId, voteType) {
             return state.votes[accId]?.[state.userName] === voteType;
+        }
+
+        function setFilter(filterType, value) {
+            state.filters[filterType] = value;
+            render();
+        }
+
+        function clearFilters() {
+            state.filters = { village: '', resort: '', type: '' };
+            render();
+        }
+
+        function getFilteredAccommodations() {
+            return state.accommodations.filter(acc => {
+                if (state.filters.village && acc.village !== state.filters.village) return false;
+                if (state.filters.resort && acc.resort !== state.filters.resort) return false;
+                if (state.filters.type && acc.type !== state.filters.type) return false;
+                return true;
+            });
         }
 
         async function addAccommodation() {
@@ -397,6 +501,7 @@
             const data = {
                 accommodations: state.accommodations,
                 votes: state.votes,
+                locationVotes: state.locationVotes,
                 exportDate: new Date().toISOString()
             };
             
@@ -406,7 +511,6 @@
                 await navigator.clipboard.writeText(jsonString);
                 alert('✅ Data gekopieerd naar klembord!\n\nPlak dit in een tekstbestand en bewaar het veilig.');
             } catch (error) {
-                // Fallback
                 const textarea = document.createElement('textarea');
                 textarea.value = jsonString;
                 document.body.appendChild(textarea);
@@ -444,14 +548,17 @@
                     return;
                 }
 
-                // Import accommodations
                 const accRef = window.firebaseRef(window.firebaseDB, 'accommodations');
                 await window.firebaseSet(accRef, data.accommodations);
                 
-                // Import votes if present
                 if (data.votes) {
                     const votesRef = window.firebaseRef(window.firebaseDB, 'votes');
                     await window.firebaseSet(votesRef, data.votes);
+                }
+
+                if (data.locationVotes) {
+                    const locVotesRef = window.firebaseRef(window.firebaseDB, 'locationVotes');
+                    await window.firebaseSet(locVotesRef, data.locationVotes);
                 }
                 
                 alert(`✅ Import succesvol! ${data.accommodations.length} accommodaties geladen.`);
@@ -474,6 +581,7 @@
                 name: '',
                 resort: '',
                 village: '',
+                type: 'groepsaccomodatie',
                 url: '',
                 imageUrl: '',
                 snowCertainty: 3,
@@ -490,48 +598,114 @@
 
         function updateFormField(field, value) {
             state.formData[field] = value;
-            // Don't re-render while typing - only update state
         }
 
         function handleResortChange(value) {
             state.formData.resort = value;
             
-            // Autofill: check if this resort exists
             const sameResort = state.accommodations.find(acc => 
                 acc.resort.toLowerCase().trim() === value.toLowerCase().trim()
             );
+            
+            // Remove old autofill indicator
+            const oldIndicator = document.getElementById('resortAutofillIndicator');
+            if (oldIndicator) oldIndicator.remove();
             
             if (sameResort) {
                 state.formData.kmSlopes = sameResort.kmSlopes;
                 state.formData.childFriendly = sameResort.childFriendly;
                 state.formData.snowCertainty = sameResort.snowCertainty;
                 
-                // Update the input fields
-                document.getElementById('kmSlopesInput').value = sameResort.kmSlopes;
-                document.getElementById('childFriendlyInput').value = sameResort.childFriendly;
-                document.getElementById('snowCertaintyInput').value = sameResort.snowCertainty;
+                const kmInput = document.getElementById('kmSlopesInput');
+                const cfInput = document.getElementById('childFriendlyInput');
+                const scInput = document.getElementById('snowCertaintyInput');
+                if (kmInput) kmInput.value = sameResort.kmSlopes;
+                if (cfInput) cfInput.value = sameResort.childFriendly;
+                if (scInput) scInput.value = sameResort.snowCertainty;
+                
+                // Show autofill indicator
+                const resortInput = document.getElementById('resortInput');
+                if (resortInput && resortInput.parentElement) {
+                    const indicator = document.createElement('p');
+                    indicator.id = 'resortAutofillIndicator';
+                    indicator.className = 'text-xs text-green-600 mt-1 flex items-center gap-1';
+                    indicator.innerHTML = '✅ Sneeuwzekerheid, kindvriendelijkheid en km pistes automatisch ingevuld';
+                    resortInput.parentElement.appendChild(indicator);
+                }
             }
         }
 
         function handleVillageChange(value) {
             state.formData.village = value;
             
-            // Autofill: check if this village exists
             const sameVillage = state.accommodations.find(acc => 
                 acc.village?.toLowerCase().trim() === value.toLowerCase().trim()
             );
             
+            // Remove old autofill indicator
+            const oldIndicator = document.getElementById('villageAutofillIndicator');
+            if (oldIndicator) oldIndicator.remove();
+            
             if (sameVillage) {
                 state.formData.apreSki = sameVillage.apreSki;
                 
-                // Update the input field
-                document.getElementById('apreSkiInput').value = sameVillage.apreSki;
+                const asInput = document.getElementById('apreSkiInput');
+                if (asInput) asInput.value = sameVillage.apreSki;
+                
+                // Show autofill indicator
+                const villageInput = document.getElementById('villageInput');
+                if (villageInput && villageInput.parentElement) {
+                    const indicator = document.createElement('p');
+                    indicator.id = 'villageAutofillIndicator';
+                    indicator.className = 'text-xs text-green-600 mt-1 flex items-center gap-1';
+                    indicator.innerHTML = '✅ Après-ski score automatisch ingevuld';
+                    villageInput.parentElement.appendChild(indicator);
+                }
             }
         }
 
         function toggleAdmin() {
             state.isAdmin = !state.isAdmin;
             render();
+        }
+
+        function showVoteDetails(accId, accName) {
+            const votes = state.votes[accId] || {};
+            const upVoters = [];
+            const downVoters = [];
+            
+            Object.entries(votes).forEach(([user, vote]) => {
+                if (vote === 'up') upVoters.push(user);
+                if (vote === 'down') downVoters.push(user);
+            });
+            
+            let message = `📊 Stemmen voor: ${accName}\n\n`;
+            message += `👍 Duimpje omhoog (${upVoters.length}):\n`;
+            message += upVoters.length > 0 ? upVoters.map(u => `  • ${u}`).join('\n') : '  (niemand)';
+            message += `\n\n👎 Duimpje omlaag (${downVoters.length}):\n`;
+            message += downVoters.length > 0 ? downVoters.map(u => `  • ${u}`).join('\n') : '  (niemand)';
+            
+            alert(message);
+        }
+
+        function showLocationVoteDetails(type, name) {
+            const votes = state.locationVotes[type]?.[name] || {};
+            const upVoters = [];
+            const downVoters = [];
+            
+            Object.entries(votes).forEach(([user, vote]) => {
+                if (vote === 'up') upVoters.push(user);
+                if (vote === 'down') downVoters.push(user);
+            });
+            
+            const typeLabel = type === 'villages' ? 'Dorp' : 'Skigebied';
+            let message = `📊 Stemmen voor ${typeLabel}: ${name}\n\n`;
+            message += `👍 Duimpje omhoog (${upVoters.length}):\n`;
+            message += upVoters.length > 0 ? upVoters.map(u => `  • ${u}`).join('\n') : '  (niemand)';
+            message += `\n\n👎 Duimpje omlaag (${downVoters.length}):\n`;
+            message += downVoters.length > 0 ? downVoters.map(u => `  • ${u}`).join('\n') : '  (niemand)';
+            
+            alert(message);
         }
 
         function handleImageError(accId) {
@@ -568,6 +742,15 @@
             return `<img src="${acc.imageUrl}" alt="${acc.name}" class="w-full h-48 object-cover" onerror="handleImageError('${acc.id}')">`;
         }
 
+        function getTypeLabel(type) {
+            const types = {
+                'groepsaccomodatie': '🏠 Groepsaccommodatie',
+                'appartementhotel': '🏨 Appartementhotel',
+                'hotel': '🏩 Hotel'
+            };
+            return types[type] || type;
+        }
+
         function renderAccommodation(acc) {
             const upCount = getVoteCount(acc.id, 'up');
             const downCount = getVoteCount(acc.id, 'down');
@@ -585,7 +768,8 @@
                             </svg>
                             ${acc.resort}
                         </p>
-                        <p class="text-gray-600 text-sm mb-3">📍 ${acc.village}</p>
+                        <p class="text-gray-600 text-sm mb-1">📍 ${acc.village}</p>
+                        <p class="text-gray-600 text-sm mb-3">${getTypeLabel(acc.type)}</p>
 
                         <div class="space-y-2 mb-4">
                             <div class="flex items-center justify-between text-sm">
@@ -626,14 +810,20 @@
                                 </button>
                             </div>
                         ` : `
-                            <div class="flex gap-2">
-                                <button onclick='startEdit(${JSON.stringify(acc).replace(/'/g, "\\'")})' 
-                                    class="flex-1 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition">
-                                    ✏️ Bewerken
-                                </button>
-                                <button onclick="deleteAccommodation('${acc.id}')" 
-                                    class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition">
-                                    🗑️
+                            <div class="space-y-2">
+                                <div class="flex gap-2">
+                                    <button onclick='startEdit(${JSON.stringify(acc).replace(/'/g, "\\'")})' 
+                                        class="flex-1 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition">
+                                        ✏️ Bewerken
+                                    </button>
+                                    <button onclick="deleteAccommodation('${acc.id}')" 
+                                        class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition">
+                                        🗑️
+                                    </button>
+                                </div>
+                                <button onclick="showVoteDetails('${acc.id}', '${acc.name.replace(/'/g, "\\'")}')" 
+                                    class="w-full px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition text-sm">
+                                    📊 Bekijk stemmen (👍 ${upCount} | 👎 ${downCount})
                                 </button>
                             </div>
                         `}
@@ -644,6 +834,123 @@
                                 Bekijk accommodatie →
                             </a>
                         ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderLocationVoting() {
+            const { villages, resorts } = getUniqueLocations();
+
+            return `
+                <div class="max-w-6xl mx-auto p-4">
+                    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                                    🗳️ Stem op Dorpen & Skigebieden
+                                </h1>
+                                <p class="text-gray-600 mb-4">
+                                    Stem eerst op je favoriete dorpen en skigebieden, daarna kun je specifieke accommodaties bekijken.
+                                </p>
+                            </div>
+                            ${state.isAdmin ? `
+                                <button 
+                                    onclick="toggleAdmin()"
+                                    class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                                    Admin Mode Uit
+                                </button>
+                            ` : ''}
+                        </div>
+                        <button 
+                            onclick="switchView('accommodations')"
+                            class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                            Ga naar Accommodaties →
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Villages -->
+                        <div class="bg-white rounded-xl shadow-lg p-6">
+                            <h2 class="text-2xl font-bold text-gray-800 mb-4">📍 Dorpen</h2>
+                            <div class="space-y-3">
+                                ${villages.map(village => {
+                                    const upCount = getLocationVoteCount('villages', village, 'up');
+                                    const downCount = getLocationVoteCount('villages', village, 'down');
+                                    const userUpVote = hasUserVotedLocation('villages', village, 'up');
+                                    const userDownVote = hasUserVotedLocation('villages', village, 'down');
+                                    
+                                    return `
+                                        <div class="p-3 bg-gray-50 rounded-lg">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="font-medium text-gray-800">${village}</span>
+                                                <div class="flex gap-2">
+                                                    <button onclick="handleLocationVote('villages', '${village}', 'up')" 
+                                                        class="flex items-center gap-1 px-3 py-1 rounded-lg transition ${
+                                                            userUpVote ? 'bg-green-600 text-white' : 'bg-white text-gray-700 hover:bg-green-50'
+                                                        }">
+                                                        👍 <span class="font-semibold">${upCount}</span>
+                                                    </button>
+                                                    <button onclick="handleLocationVote('villages', '${village}', 'down')" 
+                                                        class="flex items-center gap-1 px-3 py-1 rounded-lg transition ${
+                                                            userDownVote ? 'bg-red-600 text-white' : 'bg-white text-gray-700 hover:bg-red-50'
+                                                        }">
+                                                        👎 <span class="font-semibold">${downCount}</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            ${state.isAdmin ? `
+                                                <button onclick="showLocationVoteDetails('villages', '${village}')" 
+                                                    class="w-full px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition text-xs">
+                                                    📊 Bekijk wie gestemd heeft
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+
+                        <!-- Resorts -->
+                        <div class="bg-white rounded-xl shadow-lg p-6">
+                            <h2 class="text-2xl font-bold text-gray-800 mb-4">🏔️ Skigebieden</h2>
+                            <div class="space-y-3">
+                                ${resorts.map(resort => {
+                                    const upCount = getLocationVoteCount('resorts', resort, 'up');
+                                    const downCount = getLocationVoteCount('resorts', resort, 'down');
+                                    const userUpVote = hasUserVotedLocation('resorts', resort, 'up');
+                                    const userDownVote = hasUserVotedLocation('resorts', resort, 'down');
+                                    
+                                    return `
+                                        <div class="p-3 bg-gray-50 rounded-lg">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="font-medium text-gray-800">${resort}</span>
+                                                <div class="flex gap-2">
+                                                    <button onclick="handleLocationVote('resorts', '${resort}', 'up')" 
+                                                        class="flex items-center gap-1 px-3 py-1 rounded-lg transition ${
+                                                            userUpVote ? 'bg-green-600 text-white' : 'bg-white text-gray-700 hover:bg-green-50'
+                                                        }">
+                                                        👍 <span class="font-semibold">${upCount}</span>
+                                                    </button>
+                                                    <button onclick="handleLocationVote('resorts', '${resort}', 'down')" 
+                                                        class="flex items-center gap-1 px-3 py-1 rounded-lg transition ${
+                                                            userDownVote ? 'bg-red-600 text-white' : 'bg-white text-gray-700 hover:bg-red-50'
+                                                        }">
+                                                        👎 <span class="font-semibold">${downCount}</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            ${state.isAdmin ? `
+                                                <button onclick="showLocationVoteDetails('resorts', '${resort}')" 
+                                                    class="w-full px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition text-xs">
+                                                    📊 Bekijk wie gestemd heeft
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -684,6 +991,18 @@
                 return;
             }
 
+            // Location voting view
+            if (state.currentView === 'locations') {
+                app.innerHTML = renderLocationVoting();
+                return;
+            }
+
+            // Accommodations view
+            const { villages, resorts } = getUniqueLocations();
+            const types = ['groepsaccomodatie', 'appartementhotel', 'hotel'];
+            const filteredAccommodations = getFilteredAccommodations();
+            const hasActiveFilters = state.filters.village || state.filters.resort || state.filters.type;
+
             app.innerHTML = `
                 <div class="max-w-6xl mx-auto p-4">
                     <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
@@ -696,15 +1015,18 @@
                             </div>
                             <div class="flex gap-2">
                                 <button 
+                                    onclick="switchView('locations')"
+                                    class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                                    🗳️ Stem Locaties
+                                </button>
+                                <button 
                                     onclick="exportData()"
-                                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-                                    title="Exporteer data">
+                                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
                                     📥 Backup
                                 </button>
                                 <button 
                                     onclick="showImportDialog()"
-                                    class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
-                                    title="Importeer data">
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
                                     📤 Import
                                 </button>
                                 <button 
@@ -716,21 +1038,21 @@
                         </div>
 
                         ${state.showImportDialog ? `
-                            <div class="mb-4 p-4 bg-purple-50 border-2 border-purple-300 rounded-lg">
-                                <h3 class="font-bold text-purple-800 mb-2">📤 Data Importeren</h3>
-                                <p class="text-sm text-purple-700 mb-3">
+                            <div class="mb-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                                <h3 class="font-bold text-blue-800 mb-2">📤 Data Importeren</h3>
+                                <p class="text-sm text-blue-700 mb-3">
                                     Plak hier de inhoud van je backup:
                                 </p>
                                 <textarea
                                     id="importTextarea"
                                     placeholder='{"accommodations": [...], "votes": {...}}'
-                                    class="w-full px-3 py-2 border border-purple-300 rounded-lg font-mono text-xs mb-3"
+                                    class="w-full px-3 py-2 border border-blue-300 rounded-lg font-mono text-xs mb-3"
                                     rows="6"
                                 ></textarea>
                                 <div class="flex gap-2">
                                     <button 
                                         onclick="importData()"
-                                        class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
                                         Importeer
                                     </button>
                                     <button 
@@ -742,10 +1064,50 @@
                             </div>
                         ` : ''}
 
-                        ${state.accommodations.length > 0 ? `
-                            <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                <p class="text-sm text-green-800">
-                                    ✅ ${state.accommodations.length} accommodaties beschikbaar
+                        <!-- Filters -->
+                        ${!state.isAdmin ? `
+                            <div class="border-t pt-4 mt-4">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <h3 class="font-bold text-gray-800">🔍 Filters:</h3>
+                                    ${hasActiveFilters ? `
+                                        <button 
+                                            onclick="clearFilters()"
+                                            class="px-3 py-1 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 transition">
+                                            ✕ Wis filters
+                                        </button>
+                                    ` : ''}
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Dorp</label>
+                                        <select 
+                                            onchange="setFilter('village', this.value)"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="">Alle dorpen</option>
+                                            ${villages.map(v => `<option value="${v}" ${state.filters.village === v ? 'selected' : ''}>${v}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Skigebied</label>
+                                        <select 
+                                            onchange="setFilter('resort', this.value)"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="">Alle skigebieden</option>
+                                            ${resorts.map(r => `<option value="${r}" ${state.filters.resort === r ? 'selected' : ''}>${r}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                                        <select 
+                                            onchange="setFilter('type', this.value)"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="">Alle types</option>
+                                            ${types.map(t => `<option value="${t}" ${state.filters.type === t ? 'selected' : ''}>${getTypeLabel(t)}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-600 mt-2">
+                                    ${filteredAccommodations.length} van ${state.accommodations.length} accommodaties
                                 </p>
                             </div>
                         ` : ''}
@@ -760,6 +1122,7 @@
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">Naam *</label>
                                         <input type="text" value="${state.formData.name}" 
+                                            id="nameInput"
                                             oninput="updateFormField('name', this.value)"
                                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     </div>
@@ -776,6 +1139,16 @@
                                             id="villageInput"
                                             oninput="handleVillageChange(this.value)"
                                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+                                        <select value="${state.formData.type}"
+                                            onchange="updateFormField('type', this.value)"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="groepsaccomodatie">🏠 Groepsaccommodatie</option>
+                                            <option value="appartementhotel">🏨 Appartementhotel</option>
+                                            <option value="hotel">🏩 Hotel</option>
+                                        </select>
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">URL</label>
@@ -849,16 +1222,23 @@
                         ` : ''}
                     </div>
 
-                    ${state.accommodations.length === 0 ? `
+                    ${filteredAccommodations.length === 0 ? `
                         <div class="bg-white rounded-xl shadow-lg p-12 text-center">
                             <div class="text-6xl mb-4">🏔️</div>
                             <p class="text-gray-500 text-lg">
-                                Nog geen accommodaties toegevoegd. ${state.isAdmin ? 'Voeg hierboven je eerste accommodatie toe!' : 'Vraag de admin om accommodaties toe te voegen.'}
+                                ${hasActiveFilters ? 'Geen accommodaties gevonden met deze filters.' : 'Nog geen accommodaties toegevoegd.'}
                             </p>
+                            ${hasActiveFilters ? `
+                                <button 
+                                    onclick="clearFilters()"
+                                    class="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                    Wis filters
+                                </button>
+                            ` : ''}
                         </div>
                     ` : `
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            ${state.accommodations.map(renderAccommodation).join('')}
+                            ${filteredAccommodations.map(renderAccommodation).join('')}
                         </div>
                     `}
                 </div>
