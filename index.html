@@ -478,6 +478,7 @@
                 if (state.addLocationType === 'villages') {
                     const resort = document.getElementById('newVillageResort')?.value.trim() || '';
                     const apreSki = parseInt(document.getElementById('newVillageApreSki')?.value) || 3;
+                    const priceIndex = parseInt(document.getElementById('newVillagePriceIndex')?.value) || 100;
                     const description = document.getElementById('newVillageDescription')?.value.trim() || '';
                     const imageUrl = document.getElementById('newVillageImage')?.value.trim() || '';
                     
@@ -486,6 +487,7 @@
                     await window.firebaseSet(locationDataRef, {
                         resort: resort,
                         apreSki: apreSki,
+                        priceIndex: priceIndex,
                         description: description,
                         imageUrl: imageUrl
                     });
@@ -1309,6 +1311,19 @@
                                             />
                                         </div>
                                         <div>
+                                            <label class="block text-sm font-medium mb-1">Prijsindicatie (%)</label>
+                                            <input
+                                                type="number"
+                                                id="newVillagePriceIndex"
+                                                min="50"
+                                                max="150"
+                                                value="100"
+                                                placeholder="100 = gemiddeld, 90 = 10% goedkoper"
+                                                class="w-full px-3 py-2 border border-yellow-300 rounded-lg"
+                                            />
+                                            <p class="text-xs text-gray-600 mt-1">100% = gemiddeld, 90% = goedkoper, 110% = duurder</p>
+                                        </div>
+                                        <div>
                                             <label class="block text-sm font-medium mb-1">Omschrijving (optioneel)</label>
                                             <input
                                                 type="text"
@@ -1445,6 +1460,12 @@
                                                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                                                     </div>
                                                     <div>
+                                                        <label class="block text-sm font-medium mb-1">Prijsindicatie (%)</label>
+                                                        <input type="number" id="villagePriceIndexEdit" value="${locData.priceIndex || 100}" min="50" max="150"
+                                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                                        <p class="text-xs text-gray-500 mt-1">100% = gemiddeld, 90% = goedkoper, 110% = duurder</p>
+                                                    </div>
+                                                    <div>
                                                         <label class="block text-sm font-medium mb-1">Omschrijving</label>
                                                         <input type="text" id="villageDesc" value="${(locData.description || '').replace(/"/g, '&quot;')}"
                                                             placeholder="Bijv: Klein dorp met gezellig centrum"
@@ -1461,6 +1482,7 @@
                                                             onclick="saveLocationData('villages', '${escapedVillage}', {
                                                                 resort: document.getElementById('villageResortEdit').value,
                                                                 apreSki: parseInt(document.getElementById('villageApreSkiEdit').value) || 3,
+                                                                priceIndex: parseInt(document.getElementById('villagePriceIndexEdit').value) || 100,
                                                                 description: document.getElementById('villageDesc').value,
                                                                 imageUrl: document.getElementById('villageImage').value
                                                             })"
@@ -1499,6 +1521,29 @@
                                                         <div class="flex items-center gap-2 mt-2">
                                                             <span class="text-sm text-gray-600">🍺 Après-ski:</span>
                                                             <div class="flex gap-0.5">${renderStars(stats.apreSki)}</div>
+                                                        </div>
+                                                    ` : ''}
+                                                    ${locData.priceIndex ? `
+                                                        <div class="mt-3">
+                                                            <div class="flex items-center justify-between text-xs text-gray-600 mb-1">
+                                                                <span>💰 Prijsniveau</span>
+                                                                <span>${locData.priceIndex}%</span>
+                                                            </div>
+                                                            <div class="relative h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                                <!-- Gemiddelde lijn -->
+                                                                <div class="absolute top-0 left-1/2 w-0.5 h-full bg-gray-400"></div>
+                                                                <!-- Rode indicator -->
+                                                                <div class="absolute top-0 left-0 h-full bg-gradient-to-r from-green-400 via-yellow-400 to-red-400" 
+                                                                     style="width: ${Math.min(Math.max(locData.priceIndex, 50), 150) - 50}%"></div>
+                                                                <!-- Rode marker -->
+                                                                <div class="absolute top-0 w-1 h-full bg-red-600 shadow-lg" 
+                                                                     style="left: ${Math.min(Math.max(locData.priceIndex, 50), 150) - 50}%"></div>
+                                                            </div>
+                                                            <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                                                <span>Goedkoop</span>
+                                                                <span>Gemiddeld</span>
+                                                                <span>Duur</span>
+                                                            </div>
                                                         </div>
                                                     ` : ''}
                                                 </div>
