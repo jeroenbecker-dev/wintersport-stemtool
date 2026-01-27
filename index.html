@@ -1477,21 +1477,8 @@
                                             </div>
                                         `;
                                     }
-                                                            })"
-                                                            class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
-                                                            💾 Opslaan
-                                                        </button>
-                                                        <button 
-                                                            onclick="cancelEditLocation()"
-                                                            class="px-3 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition text-sm">
-                                                            ❌ Annuleren
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        `;
-                                    }
                                     
+                                    const escapedVillage = village.replace(/'/g, "\\'");
                                     return `
                                         <div class="p-4 bg-gray-50 rounded-lg">
                                             ${locData.imageUrl ? `
@@ -1516,13 +1503,13 @@
                                                     ` : ''}
                                                 </div>
                                                 <div class="flex gap-2 ml-3">
-                                                    <button onclick="handleLocationVote('villages', '${village}', 'up')" 
+                                                    <button onclick="handleLocationVote('villages', '${escapedVillage}', 'up')" 
                                                         class="flex items-center gap-1 px-3 py-1 rounded-lg transition ${
                                                             userUpVote ? 'bg-green-600 text-white' : 'bg-white text-gray-700 hover:bg-green-50'
                                                         }">
                                                         👍 <span class="font-semibold">${upCount}</span>
                                                     </button>
-                                                    <button onclick="handleLocationVote('villages', '${village}', 'down')" 
+                                                    <button onclick="handleLocationVote('villages', '${escapedVillage}', 'down')" 
                                                         class="flex items-center gap-1 px-3 py-1 rounded-lg transition ${
                                                             userDownVote ? 'bg-red-600 text-white' : 'bg-white text-gray-700 hover:bg-red-50'
                                                         }">
@@ -1532,11 +1519,11 @@
                                             </div>
                                             ${state.isAdmin ? `
                                                 <div class="flex gap-2 mt-3 pt-3 border-t">
-                                                    <button onclick="startEditLocation('villages', '${village}')" 
+                                                    <button onclick="startEditLocation('villages', '${escapedVillage}')" 
                                                         class="flex-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition text-sm">
                                                         ✏️ Bewerk info
                                                     </button>
-                                                    <button onclick="showLocationVoteDetails('villages', '${village}')" 
+                                                    <button onclick="showLocationVoteDetails('villages', '${escapedVillage}')" 
                                                         class="flex-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition text-sm">
                                                         📊 Stemmen
                                                     </button>
@@ -1611,6 +1598,7 @@
                                         `;
                                     }
                                     
+                                    const escapedResort = resort.replace(/'/g, "\\'");
                                     return `
                                         <div class="p-4 bg-gray-50 rounded-lg">
                                             ${locData.imageUrl ? `
@@ -1639,13 +1627,13 @@
                                                     ` : ''}
                                                 </div>
                                                 <div class="flex gap-2 ml-3">
-                                                    <button onclick="handleLocationVote('resorts', '${resort}', 'up')" 
+                                                    <button onclick="handleLocationVote('resorts', '${escapedResort}', 'up')" 
                                                         class="flex items-center gap-1 px-3 py-1 rounded-lg transition ${
                                                             userUpVote ? 'bg-green-600 text-white' : 'bg-white text-gray-700 hover:bg-green-50'
                                                         }">
                                                         👍 <span class="font-semibold">${upCount}</span>
                                                     </button>
-                                                    <button onclick="handleLocationVote('resorts', '${resort}', 'down')" 
+                                                    <button onclick="handleLocationVote('resorts', '${escapedResort}', 'down')" 
                                                         class="flex items-center gap-1 px-3 py-1 rounded-lg transition ${
                                                             userDownVote ? 'bg-red-600 text-white' : 'bg-white text-gray-700 hover:bg-red-50'
                                                         }">
@@ -1655,11 +1643,11 @@
                                             </div>
                                             ${state.isAdmin ? `
                                                 <div class="flex gap-2 mt-3 pt-3 border-t">
-                                                    <button onclick="startEditLocation('resorts', '${resort}')" 
+                                                    <button onclick="startEditLocation('resorts', '${escapedResort}')" 
                                                         class="flex-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition text-sm">
                                                         ✏️ Skikaart toevoegen
                                                     </button>
-                                                    <button onclick="showLocationVoteDetails('resorts', '${resort}')" 
+                                                    <button onclick="showLocationVoteDetails('resorts', '${escapedResort}')" 
                                                         class="flex-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition text-sm">
                                                         📊 Stemmen
                                                     </button>
