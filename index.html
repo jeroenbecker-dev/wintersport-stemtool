@@ -14,11 +14,11 @@
         // ===== FIREBASE CONFIGURATIE =====
         // Vervang deze waarden met jouw eigen Firebase project configuratie
         const firebaseConfig = {
-            apiKey: "AIzaSyAlXE6fmt0j_7MkRhllTTzR3eGLDrqzryo",
+          apiKey: "AIzaSyAlXE6fmt0j_7MkRhllTTzR3eGLDrqzryo",
       authDomain: "wintersport-2027.firebaseapp.com",
-        databaseURL: "https://wintersport-2027-default-rtdb.europe-west1.firebasedatabase.app",
+      databaseURL: "https://wintersport-2027-default-rtdb.europe-west1.firebasedatabase.app",
         projectId: "wintersport-2027",
-        storageBucket: "wintersport-2027.firebasestorage.app",
+      storageBucket: "wintersport-2027.firebasestorage.app",
       messagingSenderId: "440104424100",
       appId: "1:440104424100:web:b7c78f4dc30a4bd177cc31",
       measurementId: "G-81BPH7LR4V"
@@ -743,12 +743,15 @@
         }
 
         function getTypeLabel(type) {
+            // Fallback for old accommodations without type
+            if (!type) return '🏠 Groepsaccommodatie';
+            
             const types = {
                 'groepsaccomodatie': '🏠 Groepsaccommodatie',
                 'appartementhotel': '🏨 Appartementhotel',
                 'hotel': '🏩 Hotel'
             };
-            return types[type] || type;
+            return types[type] || '🏠 Groepsaccommodatie';
         }
 
         function renderAccommodation(acc) {
@@ -756,20 +759,23 @@
             const downCount = getVoteCount(acc.id, 'down');
             const userUpVote = hasUserVoted(acc.id, 'up');
             const userDownVote = hasUserVoted(acc.id, 'down');
+            
+            // Ensure type exists
+            const accType = acc.type || 'groepsaccomodatie';
 
             return `
                 <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
                     ${renderAccommodationImage(acc)}
                     <div class="p-5">
                         <h3 class="text-xl font-bold text-gray-800 mb-1">${acc.name}</h3>
+                        <p class="text-gray-500 text-sm italic mb-2">${getTypeLabel(accType)}</p>
                         <p class="text-blue-600 font-medium flex items-center gap-1">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="m8 3 4 8 5-5 5 15H2L8 3z"/>
                             </svg>
                             ${acc.resort}
                         </p>
-                        <p class="text-gray-600 text-sm mb-1">📍 ${acc.village}</p>
-                        <p class="text-gray-600 text-sm mb-3">${getTypeLabel(acc.type)}</p>
+                        <p class="text-gray-600 text-sm mb-3">📍 ${acc.village}</p>
 
                         <div class="space-y-2 mb-4">
                             <div class="flex items-center justify-between text-sm">
