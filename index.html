@@ -14,7 +14,7 @@
         // ===== FIREBASE CONFIGURATIE =====
         // Vervang deze waarden met jouw eigen Firebase project configuratie
         const firebaseConfig = {
-             apiKey: "AIzaSyAlXE6fmt0j_7MkRhllTTzR3eGLDrqzryo",
+            apiKey: "AIzaSyAlXE6fmt0j_7MkRhllTTzR3eGLDrqzryo",
   authDomain: "wintersport-2027.firebaseapp.com",
   databaseURL: "https://wintersport-2027-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "wintersport-2027",
@@ -265,6 +265,8 @@
             loading: true,
             imageErrors: {},
             showImportDialog: false,
+            showAddLocationDialog: false,
+            addLocationType: null, // 'villages' or 'resorts'
             filters: {
                 village: '',
                 resort: '',
@@ -433,6 +435,82 @@
         function cancelEditLocation() {
             state.editingLocation = null;
             render();
+        }
+
+        function showAddLocationDialog(type) {
+            state.showAddLocationDialog = true;
+            state.addLocationType = type;
+            render();
+        }
+
+        function hideAddLocationDialog() {
+            state.showAddLocationDialog = false;
+            state.addLocationType = null;
+            render();
+        }
+
+        async function addNewLocation() {
+            const nameInput = document.getElementById('newLocationName');
+            const name = nameInput.value.trim();
+            
+            if (!name) {
+                alert('⚠️ Voer een naam in!');
+                return;
+            }
+
+            const { villages, resorts } = getUniqueLocations();
+            const existing = state.addLocationType === 'villages' ? villages : resorts;
+            
+            if (existing.includes(name)) {
+                alert('⚠️ Deze locatie bestaat al!');
+                return;
+            }
+
+            try {
+                const sanitizedName = name.replace(/[.#$[\]]/g, '_');
+                
+                // Add a placeholder vote to make the location appear
+                const votePath = `locationVotes/${state.addLocationType}/${sanitizedName}/placeholder`;
+                const voteRef = window.firebaseRef(window.firebaseDB, votePath);
+                await window.firebaseSet(voteRef, 'placeholder');
+                
+                // Save location data with stats for autofill
+                if (state.addLocationType === 'villages') {
+                    const resort = document.getElementById('newVillageResort')?.value.trim() || '';
+                    const apreSki = parseInt(document.getElementById('newVillageApreSki')?.value) || 3;
+                    const description = document.getElementById('newVillageDescription')?.value.trim() || '';
+                    const imageUrl = document.getElementById('newVillageImage')?.value.trim() || '';
+                    
+                    const locationDataPath = `locationData/villages/${sanitizedName}`;
+                    const locationDataRef = window.firebaseRef(window.firebaseDB, locationDataPath);
+                    await window.firebaseSet(locationDataRef, {
+                        resort: resort,
+                        apreSki: apreSki,
+                        description: description,
+                        imageUrl: imageUrl
+                    });
+                } else {
+                    const kmSlopes = parseInt(document.getElementById('newResortKmSlopes')?.value) || 0;
+                    const snowCertainty = parseInt(document.getElementById('newResortSnowCertainty')?.value) || 3;
+                    const childFriendly = parseInt(document.getElementById('newResortChildFriendly')?.value) || 3;
+                    const imageUrl = document.getElementById('newResortImage')?.value.trim() || '';
+                    
+                    const locationDataPath = `locationData/resorts/${sanitizedName}`;
+                    const locationDataRef = window.firebaseRef(window.firebaseDB, locationDataPath);
+                    await window.firebaseSet(locationDataRef, {
+                        kmSlopes: kmSlopes,
+                        snowCertainty: snowCertainty,
+                        childFriendly: childFriendly,
+                        imageUrl: imageUrl
+                    });
+                }
+                
+                alert(`✅ ${name} toegevoegd met alle gegevens!`);
+                hideAddLocationDialog();
+            } catch (error) {
+                console.error('Error adding location:', error);
+                alert(`❌ Fout bij toevoegen: ${error.message}`);
+            }
         }
 
         async function handleLocationVote(type, name, voteType) {
@@ -682,13 +760,10 @@
         function handleResortChange(value) {
             state.formData.resort = value;
             
+            // First try to get from accommodations
             const sameResort = state.accommodations.find(acc => 
                 acc.resort.toLowerCase().trim() === value.toLowerCase().trim()
             );
-            
-            // Remove old autofill indicator
-            const oldIndicator = document.getElementById('resortAutofillIndicator');
-            if (oldIndicator) oldIndicator.remove();
             
             if (sameResort) {
                 state.formData.kmSlopes = sameResort.kmSlopes;
@@ -702,14 +777,32 @@
                 if (cfInput) cfInput.value = sameResort.childFriendly;
                 if (scInput) scInput.value = sameResort.snowCertainty;
                 
-                // Show autofill indicator
-                const resortInput = document.getElementById('resortInput');
-                if (resortInput && resortInput.parentElement) {
-                    const indicator = document.createElement('p');
-                    indicator.id = 'resortAutofillIndicator';
-                    indicator.className = 'text-xs text-green-600 mt-1 flex items-center gap-1';
-                    indicator.innerHTML = '✅ Sneeuwzekerheid, kindvriendelijkheid en km pistes automatisch ingevuld';
-                    resortInput.parentElement.appendChild(indicator);
+                showAutofillIndicator('resortAutofillIndicator', 'resortInput', 
+                    '✅ Sneeuwzekerheid, kindvriendelijkheid en km pistes automatisch ingevuld');
+            } else {
+                // Try to get from manually added resort data
+                const resortData = getLocationData('resorts', value);
+                if (resortData.kmSlopes || resortData.snowCertainty || resortData.childFriendly) {
+                    if (resortData.kmSlopes) {
+                        state.formData.kmSlopes = resortData.kmSlopes;
+                        const kmInput = document.getElementById('kmSlopesInput');
+                        if (kmInput) kmInput.value = resortData.kmSlopes;
+                    }
+                    if (resortData.childFriendly) {
+                        state.formData.childFriendly = resortData.childFriendly;
+                        const cfInput = document.getElementById('childFriendlyInput');
+                        if (cfInput) cfInput.value = resortData.childFriendly;
+                    }
+                    if (resortData.snowCertainty) {
+                        state.formData.snowCertainty = resortData.snowCertainty;
+                        const scInput = document.getElementById('snowCertaintyInput');
+                        if (scInput) scInput.value = resortData.snowCertainty;
+                    }
+                    
+                    showAutofillIndicator('resortAutofillIndicator', 'resortInput', 
+                        '✅ Gegevens automatisch ingevuld uit handmatig toegevoegd skigebied');
+                } else {
+                    removeAutofillIndicator('resortAutofillIndicator');
                 }
             }
         }
@@ -717,13 +810,10 @@
         function handleVillageChange(value) {
             state.formData.village = value;
             
+            // First try to get from accommodations
             const sameVillage = state.accommodations.find(acc => 
                 acc.village?.toLowerCase().trim() === value.toLowerCase().trim()
             );
-            
-            // Remove old autofill indicator
-            const oldIndicator = document.getElementById('villageAutofillIndicator');
-            if (oldIndicator) oldIndicator.remove();
             
             if (sameVillage) {
                 state.formData.apreSki = sameVillage.apreSki;
@@ -731,16 +821,53 @@
                 const asInput = document.getElementById('apreSkiInput');
                 if (asInput) asInput.value = sameVillage.apreSki;
                 
-                // Show autofill indicator
-                const villageInput = document.getElementById('villageInput');
-                if (villageInput && villageInput.parentElement) {
-                    const indicator = document.createElement('p');
-                    indicator.id = 'villageAutofillIndicator';
-                    indicator.className = 'text-xs text-green-600 mt-1 flex items-center gap-1';
-                    indicator.innerHTML = '✅ Après-ski score automatisch ingevuld';
-                    villageInput.parentElement.appendChild(indicator);
+                // Also autofill resort if available
+                if (sameVillage.resort) {
+                    state.formData.resort = sameVillage.resort;
+                    const resortInput = document.getElementById('resortInput');
+                    if (resortInput) resortInput.value = sameVillage.resort;
+                }
+                
+                showAutofillIndicator('villageAutofillIndicator', 'villageInput', 
+                    '✅ Après-ski score' + (sameVillage.resort ? ' en skigebied' : '') + ' automatisch ingevuld');
+            } else {
+                // Try to get from manually added village data
+                const villageData = getLocationData('villages', value);
+                if (villageData.apreSki || villageData.resort) {
+                    if (villageData.apreSki) {
+                        state.formData.apreSki = villageData.apreSki;
+                        const asInput = document.getElementById('apreSkiInput');
+                        if (asInput) asInput.value = villageData.apreSki;
+                    }
+                    if (villageData.resort) {
+                        state.formData.resort = villageData.resort;
+                        const resortInput = document.getElementById('resortInput');
+                        if (resortInput) resortInput.value = villageData.resort;
+                    }
+                    
+                    showAutofillIndicator('villageAutofillIndicator', 'villageInput', 
+                        '✅ Gegevens automatisch ingevuld uit handmatig toegevoegd dorp');
+                } else {
+                    removeAutofillIndicator('villageAutofillIndicator');
                 }
             }
+        }
+
+        function showAutofillIndicator(id, inputId, message) {
+            removeAutofillIndicator(id);
+            const input = document.getElementById(inputId);
+            if (input && input.parentElement) {
+                const indicator = document.createElement('p');
+                indicator.id = id;
+                indicator.className = 'text-xs text-green-600 mt-1 flex items-center gap-1';
+                indicator.innerHTML = message;
+                input.parentElement.appendChild(indicator);
+            }
+        }
+
+        function removeAutofillIndicator(id) {
+            const oldIndicator = document.getElementById(id);
+            if (oldIndicator) oldIndicator.remove();
         }
 
         function toggleAdmin() {
@@ -1044,19 +1171,40 @@
             // Calculate aggregate stats from accommodations
             const getVillageStats = (village) => {
                 const vilAccs = state.accommodations.filter(a => a.village === village);
-                if (vilAccs.length === 0) return null;
-                const avgApreSki = Math.round(vilAccs.reduce((sum, a) => sum + (a.apreSki || 0), 0) / vilAccs.length);
-                const resort = vilAccs[0]?.resort || '';
-                return { apreSki: avgApreSki, resort: resort };
+                if (vilAccs.length > 0) {
+                    const avgApreSki = Math.round(vilAccs.reduce((sum, a) => sum + (a.apreSki || 0), 0) / vilAccs.length);
+                    const resort = vilAccs[0]?.resort || '';
+                    return { apreSki: avgApreSki, resort: resort };
+                }
+                // Fallback to manual data
+                const villageData = getLocationData('villages', village);
+                if (villageData.apreSki || villageData.resort) {
+                    return {
+                        apreSki: villageData.apreSki || 0,
+                        resort: villageData.resort || ''
+                    };
+                }
+                return null;
             };
 
             const getResortStats = (resort) => {
                 const resAccs = state.accommodations.filter(a => a.resort === resort);
-                if (resAccs.length === 0) return null;
-                const avgSnow = Math.round(resAccs.reduce((sum, a) => sum + (a.snowCertainty || 0), 0) / resAccs.length);
-                const avgChild = Math.round(resAccs.reduce((sum, a) => sum + (a.childFriendly || 0), 0) / resAccs.length);
-                const totalKm = resAccs[0]?.kmSlopes || 0;
-                return { snowCertainty: avgSnow, childFriendly: avgChild, kmSlopes: totalKm };
+                if (resAccs.length > 0) {
+                    const avgSnow = Math.round(resAccs.reduce((sum, a) => sum + (a.snowCertainty || 0), 0) / resAccs.length);
+                    const avgChild = Math.round(resAccs.reduce((sum, a) => sum + (a.childFriendly || 0), 0) / resAccs.length);
+                    const totalKm = resAccs[0]?.kmSlopes || 0;
+                    return { snowCertainty: avgSnow, childFriendly: avgChild, kmSlopes: totalKm };
+                }
+                // Fallback to manual data
+                const resortData = getLocationData('resorts', resort);
+                if (resortData.kmSlopes || resortData.snowCertainty || resortData.childFriendly) {
+                    return {
+                        kmSlopes: resortData.kmSlopes || 0,
+                        snowCertainty: resortData.snowCertainty || 0,
+                        childFriendly: resortData.childFriendly || 0
+                    };
+                }
+                return null;
             };
 
             return `
@@ -1119,11 +1267,150 @@
                             </div>
                         ` : ''}
 
+                        ${state.showAddLocationDialog ? `
+                            <div class="mb-4 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+                                <h3 class="font-bold text-yellow-800 mb-2">
+                                    ➕ Nieuw ${state.addLocationType === 'villages' ? 'Dorp' : 'Skigebied'} Toevoegen
+                                </h3>
+                                <p class="text-sm text-yellow-700 mb-3">
+                                    Vul de gegevens in. Deze worden gebruikt als autofill bij het toevoegen van accommodaties.
+                                </p>
+                                
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">Naam *</label>
+                                        <input
+                                            type="text"
+                                            id="newLocationName"
+                                            placeholder="${state.addLocationType === 'villages' ? 'bijv: Zell am See' : 'bijv: Zillertal Arena'}"
+                                            class="w-full px-3 py-2 border border-yellow-300 rounded-lg"
+                                        />
+                                    </div>
+                                    
+                                    ${state.addLocationType === 'villages' ? `
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">Skigebied (optioneel)</label>
+                                            <input
+                                                type="text"
+                                                id="newVillageResort"
+                                                placeholder="bijv: Zillertal"
+                                                class="w-full px-3 py-2 border border-yellow-300 rounded-lg"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">Après-ski score (0-5)</label>
+                                            <input
+                                                type="number"
+                                                id="newVillageApreSki"
+                                                min="0"
+                                                max="5"
+                                                value="3"
+                                                class="w-full px-3 py-2 border border-yellow-300 rounded-lg"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">Omschrijving (optioneel)</label>
+                                            <input
+                                                type="text"
+                                                id="newVillageDescription"
+                                                placeholder="bijv: Klein dorp met gezellig centrum"
+                                                class="w-full px-3 py-2 border border-yellow-300 rounded-lg"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">Foto URL (optioneel)</label>
+                                            <input
+                                                type="url"
+                                                id="newVillageImage"
+                                                placeholder="https://..."
+                                                class="w-full px-3 py-2 border border-yellow-300 rounded-lg"
+                                            />
+                                        </div>
+                                    ` : `
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">Km pistes</label>
+                                            <input
+                                                type="number"
+                                                id="newResortKmSlopes"
+                                                placeholder="bijv: 180"
+                                                class="w-full px-3 py-2 border border-yellow-300 rounded-lg"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">Sneeuwzekerheid (0-5)</label>
+                                            <input
+                                                type="number"
+                                                id="newResortSnowCertainty"
+                                                min="0"
+                                                max="5"
+                                                value="3"
+                                                class="w-full px-3 py-2 border border-yellow-300 rounded-lg"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">Kindvriendelijkheid (0-5)</label>
+                                            <input
+                                                type="number"
+                                                id="newResortChildFriendly"
+                                                min="0"
+                                                max="5"
+                                                value="3"
+                                                class="w-full px-3 py-2 border border-yellow-300 rounded-lg"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium mb-1">Skikaart URL (optioneel)</label>
+                                            <input
+                                                type="url"
+                                                id="newResortImage"
+                                                placeholder="https://..."
+                                                class="w-full px-3 py-2 border border-yellow-300 rounded-lg"
+                                            />
+                                        </div>
+                                    `}
+                                </div>
+                                
+                                <div class="flex gap-2 mt-4">
+                                    <button 
+                                        onclick="addNewLocation()"
+                                        class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition">
+                                        ➕ Toevoegen
+                                    </button>
+                                    <button 
+                                        onclick="hideAddLocationDialog()"
+                                        class="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition">
+                                        Annuleren
+                                    </button>
+                                </div>
+                            </div>
+                        ` : ''}
+
                         <button 
                             onclick="switchView('preference')"
                             class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
                             Volgende stap: Accommodatietype →
                         </button>
+
+                        ${state.isAdmin ? `
+                            <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <h3 class="font-bold text-yellow-800 mb-2">➕ Nieuwe Locatie Toevoegen</h3>
+                                <p class="text-sm text-yellow-700 mb-3">
+                                    Voeg handmatig een dorp of skigebied toe dat nog niet in de lijst staat.
+                                </p>
+                                <div class="flex gap-3">
+                                    <button 
+                                        onclick="showAddLocationDialog('villages')"
+                                        class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition text-sm">
+                                        ➕ Nieuw Dorp
+                                    </button>
+                                    <button 
+                                        onclick="showAddLocationDialog('resorts')"
+                                        class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition text-sm">
+                                        ➕ Nieuw Skigebied
+                                    </button>
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
