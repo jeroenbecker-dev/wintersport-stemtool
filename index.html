@@ -367,8 +367,13 @@
 
         // Actions
         async function saveUserName(name) {
-            localStorage.setItem('userName', name);
-            state.userName = name;
+            const trimmedName = name.trim();
+            if (!trimmedName) {
+                alert('⚠️ Voer een naam in om te beginnen!');
+                return;
+            }
+            localStorage.setItem('userName', trimmedName);
+            state.userName = trimmedName;
             state.hasSetName = true;
             render();
         }
@@ -949,6 +954,81 @@
             }
         }
 
+        async function showAllLocationVotes() {
+            if (!window.firebaseDB) return;
+            
+            try {
+                const locVotesRef = window.firebaseRef(window.firebaseDB, 'locationVotes');
+                const snapshot = await window.firebaseGet(locVotesRef);
+                
+                if (!snapshot.exists()) {
+                    alert('Nog geen stemmen op locaties.');
+                    return;
+                }
+                
+                const votes = snapshot.val();
+                let message = '📊 ALLE STEMMEN OP LOCATIES\n';
+                message += '═'.repeat(50) + '\n\n';
+                
+                // Villages
+                if (votes.villages) {
+                    message += '📍 DORPEN:\n';
+                    message += '─'.repeat(50) + '\n';
+                    Object.entries(votes.villages).sort().forEach(([village, users]) => {
+                        const upVoters = [];
+                        const downVoters = [];
+                        Object.entries(users).forEach(([user, vote]) => {
+                            if (user === 'placeholder') return;
+                            if (vote === 'up') upVoters.push(user);
+                            if (vote === 'down') downVoters.push(user);
+                        });
+                        
+                        if (upVoters.length > 0 || downVoters.length > 0) {
+                            message += `\n${village}:\n`;
+                            if (upVoters.length > 0) {
+                                message += `  👍 (${upVoters.length}): ${upVoters.join(', ')}\n`;
+                            }
+                            if (downVoters.length > 0) {
+                                message += `  👎 (${downVoters.length}): ${downVoters.join(', ')}\n`;
+                            }
+                        }
+                    });
+                }
+                
+                message += '\n' + '═'.repeat(50) + '\n\n';
+                
+                // Resorts
+                if (votes.resorts) {
+                    message += '🏔️ SKIGEBIEDEN:\n';
+                    message += '─'.repeat(50) + '\n';
+                    Object.entries(votes.resorts).sort().forEach(([resort, users]) => {
+                        const upVoters = [];
+                        const downVoters = [];
+                        Object.entries(users).forEach(([user, vote]) => {
+                            if (user === 'placeholder') return;
+                            if (vote === 'up') upVoters.push(user);
+                            if (vote === 'down') downVoters.push(user);
+                        });
+                        
+                        if (upVoters.length > 0 || downVoters.length > 0) {
+                            message += `\n${resort}:\n`;
+                            if (upVoters.length > 0) {
+                                message += `  👍 (${upVoters.length}): ${upVoters.join(', ')}\n`;
+                            }
+                            if (downVoters.length > 0) {
+                                message += `  👎 (${downVoters.length}): ${downVoters.join(', ')}\n`;
+                            }
+                        }
+                    });
+                }
+                
+                alert(message);
+            } catch (error) {
+                console.error('Error loading votes:', error);
+                alert('Fout bij laden stemmen.');
+            }
+        }
+
         function handleImageError(accId) {
             state.imageErrors[accId] = true;
             render();
@@ -1428,6 +1508,11 @@
                                         class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition text-sm">
                                         ➕ Nieuw Skigebied
                                     </button>
+                                    <button 
+                                        onclick="showAllLocationVotes()"
+                                        class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm">
+                                        📊 Bekijk ALLE stemmen
+                                    </button>
                                 </div>
                             </div>
                         ` : ''}
@@ -1729,19 +1814,23 @@
                 app.innerHTML = `
                     <div class="min-h-screen flex items-center justify-center p-4">
                         <div class="bg-white rounded-xl shadow-lg p-8 max-w-md w-full">
-                            <h2 class="text-2xl font-bold text-gray-800 mb-4">Welkom!</h2>
+                            <h2 class="text-2xl font-bold text-gray-800 mb-4">🎿 Welkom bij de Wintersport Stemtool!</h2>
                             <p class="text-gray-600 mb-6">Voer je naam in om te beginnen met stemmen:</p>
                             <input 
                                 type="text" 
                                 id="nameInput"
                                 placeholder="Je naam"
+                                onkeypress="if(event.key === 'Enter') saveUserName(document.getElementById('nameInput').value)"
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                             <button 
                                 onclick="saveUserName(document.getElementById('nameInput').value)"
                                 class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
-                                Start
+                                Start met Stemmen
                             </button>
+                            <p class="text-xs text-gray-500 mt-4 text-center">
+                                Je naam wordt gebruikt om je voorkeuren bij te houden
+                            </p>
                         </div>
                     </div>
                 `;
