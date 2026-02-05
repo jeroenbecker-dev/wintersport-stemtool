@@ -256,7 +256,7 @@
             locationData: {}, // metadata for villages and resorts (descriptions, images, stats)
             userName: localStorage.getItem('userName') || '',
             hasSetName: !!localStorage.getItem('userName'),
-            currentView: 'locations', // 'locations', 'preference', or 'accommodations'
+            currentView: 'accommodations', // Start with accommodations view
             accommodationPreference: localStorage.getItem('accommodationPreference') || '',
             isAdmin: false,
             isEditing: false,
@@ -1214,7 +1214,7 @@
                         <div class="flex justify-between items-center mb-6">
                             <div>
                                 <h1 class="text-3xl font-bold text-gray-800 mb-2">
-                                    🏠 Stap 2: Welk type accommodatie heeft je voorkeur?
+                                    🏠 Type Accommodatie
                                 </h1>
                                 <p class="text-gray-600">
                                     Selecteer het type accommodatie waar je de voorkeur aan geeft. Dit helpt ons om de beste opties te tonen.
@@ -1278,14 +1278,14 @@
 
                         <div class="flex gap-3">
                             <button 
-                                onclick="switchView('locations')"
+                                onclick="switchView('accommodations')"
                                 class="px-6 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition">
-                                ← Terug naar Skidorpen en Skigebieden
+                                ← Terug naar Accommodaties
                             </button>
                             <button 
-                                onclick="switchView('accommodations')"
-                                class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                                Verder naar Accommodaties →
+                                onclick="switchView('locations')"
+                                class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                                Naar Locaties →
                             </button>
                         </div>
                     </div>
@@ -1341,10 +1341,10 @@
                         <div class="flex justify-between items-center mb-4">
                             <div>
                                 <h1 class="text-3xl font-bold text-gray-800 mb-2">
-                                    🗳️ Stap 1: Stem op Dorpen & Skigebieden
+                                    🗳️ Stem op Dorpen & Skigebieden
                                 </h1>
                                 <p class="text-gray-600">
-                                    Stem op je favoriete locaties. Klik daarna op "Volgende stap" om je voorkeur voor accommodatietype aan te geven.
+                                    Stem op je favoriete locaties. Je kunt daarna ook je voorkeur voor accommodatietype aangeven.
                                 </p>
                             </div>
                             <div class="flex gap-2">
@@ -1529,7 +1529,7 @@
                         <button 
                             onclick="switchView('preference')"
                             class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                            Volgende stap: Accommodatietype →
+                            Naar Type Voorkeur →
                         </button>
 
                         ${state.isAdmin ? `
@@ -1908,14 +1908,19 @@
                             </div>
                             <div class="flex gap-2">
                                 <button 
+                                    onclick="switchView('accommodations')"
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                    🏔️ Accommodaties
+                                </button>
+                                <button 
                                     onclick="switchView('locations')"
                                     class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
-                                    🗳️ Stap 1: Locaties
+                                    🗳️ Locaties
                                 </button>
                                 <button 
                                     onclick="switchView('preference')"
                                     class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">
-                                    🏠 Stap 2: Type
+                                    🏠 Type Accommodatie
                                 </button>
                                 <button 
                                     onclick="exportData()"
@@ -1978,7 +1983,18 @@
                                     </button>
                                 </div>
                             </div>
-                        ` : ''}
+                        ` : `
+                            <div class="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl shadow-sm">
+                                <p class="text-gray-800 leading-relaxed">
+                                    <strong>Lieve mensen,</strong><br><br>
+                                    Uit jullie eerste reacties is een voorkeur gekomen voor <strong>Kirchberg, Mayrhofen en Livigno</strong>. 
+                                    Jules, Maartje, Annelien en Jeroen zijn de afgelopen week op zoek gegaan naar geschikte accommodaties 
+                                    en hebben contact opgenomen over beschikbaarheid en prijzen. Daar is onderstaande selectie uit naar voren gekomen.<br><br>
+                                    Wellicht wordt deze de komende dagen nog aangevuld, dus <strong>hou deze site in de gaten!</strong><br><br>
+                                    Doel is nog steeds om <strong>vóór 14 februari</strong> te boeken, dus <strong>breng snel je stem uit!!</strong> 🎿
+                                </p>
+                            </div>
+                        `}
 
                         <!-- Filters -->
                         ${!state.isAdmin ? `
